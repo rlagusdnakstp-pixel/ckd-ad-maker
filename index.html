@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AD MAKER — 광고 이미지 베리에이션 툴</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --font-display: 'Syne', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --c1: #0A0A0A; --c2: #F5F3EE; --c3: #E8E4DB; --c4: #C8C3B8;
+    --accent: #FF4D1C; --accent2: #1C6EFF;
+    --radius: 12px;
+  }
+  html, body { height: 100%; background: var(--c3); font-family: var(--font-body); color: var(--c1); }
+  header { background: var(--c1); color: var(--c2); padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
+  header .logo { font-family: var(--font-display); font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  header .logo span { color: var(--accent); }
+  header .tagline { font-size: 12px; color: #666; }
+  .app { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 52px); }
+  .sidebar { background: var(--c1); color: var(--c2); padding: 24px 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; border-right: 1px solid #1a1a1a; }
+  .section-label { font-size: 10px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+  .upload-zone { border: 1.5px dashed #444; border-radius: 10px; padding: 24px 16px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; overflow: hidden; }
+  .upload-zone:hover { border-color: #888; }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
+  .upload-zone p { font-size: 12px; color: #888; line-height: 1.6; }
+  .upload-thumb { width: 100%; height: 80px; object-fit: cover; border-radius: 6px; margin-bottom: 6px; display: none; }
+  .tab-row { display: flex; gap: 4px; background: #1a1a1a; border-radius: 8px; padding: 4px; }
+  .tab-btn { flex: 1; padding: 7px 4px; font-size: 12px; font-weight: 500; font-family: var(--font-body); border: none; background: transparent; color: #666; cursor: pointer; border-radius: 5px; transition: all 0.15s; }
+  .tab-btn.active { background: var(--c2); color: var(--c1); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; flex-direction: column; gap: 12px; }
+  .field-row { display: flex; flex-direction: column; gap: 5px; }
+  .field-row label { font-size: 11px; color: #777; font-weight: 500; }
+  .field-row input[type=text], .field-row textarea, .field-row select { background: #1a1a1a; border: 0.5px solid #333; color: var(--c2); border-radius: 7px; padding: 8px 10px; font-size: 12px; font-family: var(--font-body); width: 100%; outline: none; transition: border-color 0.15s; resize: none; }
+  .field-row input:focus, .field-row textarea:focus, .field-row select:focus { border-color: #555; }
+  .field-row select option { background: #1a1a1a; }
+  .color-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .color-swatch { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s; flex-shrink: 0; }
+  .color-swatch.active { border-color: #fff; }
+  .color-swatch.custom { background: linear-gradient(135deg, #ff0080, #ff8c00, #40c9ff); display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; position: relative; overflow: hidden; }
+  .color-swatch.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .size-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+  .size-btn { padding: 7px 4px; font-size: 11px; font-family: var(--font-body); border: 0.5px solid #333; background: transparent; color: #888; border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.15s; font-weight: 500; line-height: 1.5; }
+  .size-btn small { display: block; font-size: 10px; color: #555; }
+  .size-btn.active { border-color: #888; color: var(--c2); background: #222; }
+  .size-btn.active small { color: #aaa; }
+  .range-row { display: flex; align-items: center; gap: 8px; }
+  .range-row input[type=range] { flex: 1; accent-color: var(--c2); }
+  .range-row span { font-size: 11px; color: #888; min-width: 32px; text-align: right; }
+  .logo-upload { display: flex; align-items: center; gap: 8px; background: #1a1a1a; border: 0.5px solid #333; border-radius: 7px; padding: 8px 10px; cursor: pointer; position: relative; overflow: hidden; transition: border-color 0.15s; }
+  .logo-upload:hover { border-color: #555; }
+  .logo-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .logo-upload span { font-size: 12px; color: #888; }
+  .logo-preview-small { width: 24px; height: 24px; object-fit: contain; border-radius: 3px; display: none; }
+  .pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 4px; }
+  .pos-btn { padding: 7px 4px; font-size: 10px; font-family: var(--font-body); border: 0.5px solid #333; background: transparent; color: #666; border-radius: 5px; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .pos-btn.active { border-color: #888; color: var(--c2); background: #222; }
+  .btn-generate { width: 100%; padding: 14px; font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: 0.5px; background: var(--accent); color: #fff; border: none; border-radius: 9px; cursor: pointer; transition: transform 0.15s, opacity 0.15s; margin-top: auto; }
+  .btn-generate:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-generate:active { transform: translateY(0) scale(0.98); }
+  .canvas-area { background: var(--c3); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; gap: 20px; }
+  .canvas-wrap { position: relative; display: inline-block; box-shadow: 0 12px 60px rgba(0,0,0,0.18); }
+  canvas { display: block; border-radius: 4px; max-width: 100%; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #9a9690; text-align: center; }
+  .empty-state .big-icon { font-size: 64px; opacity: 0.35; }
+  .empty-state h2 { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: #888; }
+  .empty-state p { font-size: 14px; line-height: 1.7; max-width: 260px; }
+  .var-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .var-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #9a9690; align-self: center; }
+  .var-thumb { width: 80px; height: 80px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; overflow: hidden; transition: all 0.2s; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+  .var-thumb:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+  .var-thumb.active { border-color: var(--accent); }
+  .var-thumb canvas { width: 100%; height: 100%; display: block; }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .tool-btn { padding: 9px 18px; font-size: 13px; font-family: var(--font-body); font-weight: 500; border: 1px solid #ccc; background: var(--c2); color: var(--c1); border-radius: 8px; cursor: pointer; transition: all 0.15s; }
+  .tool-btn:hover { background: #fff; border-color: #aaa; }
+  .tool-btn.primary { background: var(--c1); color: var(--c2); border-color: var(--c1); }
+  .tool-btn.primary:hover { opacity: 0.85; }
+  .badge { font-size: 10px; background: var(--accent); color: #fff; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  @media (max-width: 768px) { .app { grid-template-columns: 1fr; } .sidebar { max-height: 60vh; } header { padding: 12px 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">AD <span>MAKER</span> <span class="badge">BETA</span></div>
+  <div class="tagline">광고 이미지 베리에이션 툴</div>
+</header>
+<div class="app">
+  <div class="sidebar">
+    <div>
+      <div class="section-label">배경 이미지</div>
+      <div class="upload-zone" id="bgZone">
+        <input type="file" accept="image/*" id="bgInput">
+        <img class="upload-thumb" id="bgThumb">
+        <div class="icon">🖼</div>
+        <p>이미지를 드래그하거나<br>클릭해서 업로드</p>
+      </div>
+    </div>
+    <div class="tab-row">
+      <button class="tab-btn active" data-tab="text">텍스트</button>
+      <button class="tab-btn" data-tab="logo">로고</button>
+      <button class="tab-btn" data-tab="style">스타일</button>
+    </div>
+    <div class="tab-panel active" id="tab-text">
+      <div class="field-row"><label>헤드라인</label><input type="text" id="headline" value="지금 바로 시작하세요!"></div>
+      <div class="field-row"><label>서브 텍스트</label><input type="text" id="subtext" value="특별 할인 최대 50%"></div>
+      <div class="field-row"><label>CTA 버튼</label><input type="text" id="ctaText" value="지금 구매하기"></div>
+      <div class="field-row">
+        <label>텍스트 색상</label>
+        <div class="color-row" id="textColorRow">
+          <div class="color-swatch active" style="background:#FFFFFF" data-color="#FFFFFF"></div>
+          <div class="color-swatch" style="background:#0A0A0A" data-color="#0A0A0A"></div>
+          <div class="color-swatch" style="background:#FF4D1C" data-color="#FF4D1C"></div>
+          <div class="color-swatch" style="background:#FFE135" data-color="#FFE135"></div>
+          <div class="color-swatch" style="background:#1C6EFF" data-color="#1C6EFF"></div>
+          <div class="color-swatch custom"><input type="color" id="customTextColor" value="#ffffff">+</div>
+        </div>
+      </div>
+      <div class="field-row">
+        <label>CTA 배경색</label>
+        <div class="color-row" id="ctaColorRow">
+          <div class="color-swatch active" style="background:#FF4D1C" data-color="#FF4D1C"></div>
+          <div class="color-swatch" style="background:#1C6EFF" data-color="#1C6EFF"></div>
+          <div class="color-swatch" style="background:#0A0A0A" data-color="#0A0A0A"></div>
+          <div class="color-swatch" style="background:#FFFFFF" data-color="#FFFFFF"></div>
+          <div class="color-swatch" style="background:#FFE135" data-color="#FFE135"></div>
+          <div class="color-swatch custom"><input type="color" id="customCtaColor" value="#ff4d1c">+</div>
+        </div>
+      </div>
+      <div class="field-row">
+        <label>텍스트 위치</label>
+        <div class="pos-grid" id="posGrid">
+          <button class="pos-btn" data-pos="tl">↖ 좌상</button><button class="pos-btn" data-pos="tc">↑ 중상</button><button class="pos-btn" data-pos="tr">↗ 우상</button>
+          <button class="pos-btn" data-pos="ml">← 좌중</button><button class="pos-btn" data-pos="mc">가운데</button><button class="pos-btn" data-pos="mr">→ 우중</button>
+          <button class="pos-btn" data-pos="bl">↙ 좌하</button><button class="pos-btn active" data-pos="bc">↓ 중하</button><button class="pos-btn" data-pos="br">↘ 우하</button>
+        </div>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab-logo">
+      <div class="field-row"><label>로고 이미지</label><label class="logo-upload"><input type="file" accept="image/*" id="logoInput"><img class="logo-preview-small" id="logoThumbSmall"><span id="logoLabel">로고 파일 선택</span></label></div>
+      <div class="field-row"><label>로고 텍스트</label><input type="text" id="logoText" value="BRAND"></div>
+      <div class="field-row">
+        <label>로고 위치</label>
+        <div class="pos-grid" id="logoPosGrid">
+          <button class="pos-btn active" data-pos="tl">↖ 좌상</button><button class="pos-btn" data-pos="tc">↑ 중상</button><button class="pos-btn" data-pos="tr">↗ 우상</button>
+          <button class="pos-btn" data-pos="ml">← 좌중</button><button class="pos-btn" data-pos="mc">가운데</button><button class="pos-btn" data-pos="mr">→ 우중</button>
+          <button class="pos-btn" data-pos="bl">↙ 좌하</button><button class="pos-btn" data-pos="bc">↓ 중하</button><button class="pos-btn" data-pos="br">↘ 우하</button>
+        </div>
+      </div>
+      <div class="field-row"><label>로고 크기</label><div class="range-row"><input type="range" min="40" max="200" value="80" id="logoSize" step="1"><span id="logoSizeVal">80px</span></div></div>
+    </div>
+    <div class="tab-panel" id="tab-style">
+      <div class="field-row">
+        <label>광고 형식</label>
+        <div class="size-row" id="sizeRow">
+          <button class="size-btn active" data-w="1080" data-h="1080">1:1<br><small>인스타</small></button>
+          <button class="size-btn" data-w="1080" data-h="1920">9:16<br><small>스토리</small></button>
+          <button class="size-btn" data-w="1200" data-h="628">1.91:1<br><small>피드</small></button>
+          <button class="size-btn" data-w="728" data-h="90">배너<br><small>가로형</small></button>
+          <button class="size-btn" data-w="300" data-h="250">사각<br><small>디스플레이</small></button>
+          <button class="size-btn" data-w="1080" data-h="566">와이드<br><small>카드뉴스</small></button>
+        </div>
+      </div>
+      <div class="field-row"><label>오버레이 불투명도</label><div class="range-row"><input type="range" min="0" max="90" value="35" id="overlayOpacity" step="1"><span id="overlayVal">35%</span></div></div>
+      <div class="field-row">
+        <label>오버레이 색상</label>
+        <div class="color-row" id="ovColorRow">
+          <div class="color-swatch active" style="background:#0A0A0A" data-color="#0A0A0A"></div>
+          <div class="color-swatch" style="background:#FFFFFF" data-color="#FFFFFF"></div>
+          <div class="color-swatch" style="background:#FF4D1C" data-color="#FF4D1C"></div>
+          <div class="color-swatch" style="background:#1C6EFF" data-color="#1C6EFF"></div>
+          <div class="color-swatch custom"><input type="color" id="customOvColor" value="#000000">+</div>
+        </div>
+      </div>
+      <div class="field-row"><label>헤드라인 크기</label><div class="range-row"><input type="range" min="20" max="100" value="48" id="headlineSize" step="1"><span id="headlineSizeVal">48px</span></div></div>
+      <div class="field-row"><label>글꼴</label><select id="fontSelect"><option value="Arial">Arial Bold</option><option value="Georgia">Georgia Bold</option><option value="Courier New">Courier New Bold</option><option value="Verdana">Verdana Bold</option></select></div>
+    </div>
+    <button class="btn-generate" id="generateBtn">광고 생성하기 →</button>
+  </div>
+  <div class="canvas-area" id="canvasArea">
+    <div class="empty-state" id="emptyState">
+      <div class="big-icon">🎨</div>
+      <h2>AD MAKER</h2>
+      <p>왼쪽에서 배경 이미지를 업로드하고<br>텍스트를 입력한 후<br><strong>광고 생성하기</strong>를 눌러보세요</p>
+    </div>
+    <div id="canvasWrap" class="canvas-wrap" style="display:none"><canvas id="mainCanvas"></canvas></div>
+    <div class="var-row" id="varRow" style="display:none"><span class="var-label">베리에이션</span></div>
+    <div class="toolbar" id="toolbar" style="display:none">
+      <button class="tool-btn" id="regenerateBtn">↺ 다시 생성</button>
+      <button class="tool-btn" id="varBtn">+ 베리에이션</button>
+      <button class="tool-btn primary" id="downloadBtn">↓ 다운로드</button>
+    </div>
+  </div>
+</div>
+<script>
+const state={bgImg:null,logoImg:null,headline:'지금 바로 시작하세요!',subtext:'특별 할인 최대 50%',ctaText:'지금 구매하기',textColor:'#FFFFFF',ctaColor:'#FF4D1C',logoText:'BRAND',logoPos:'tl',textPos:'bc',logoSize:80,overlayOpacity:35,overlayColor:'#0A0A0A',headlineSize:48,fontFamily:'Arial',canvasW:1080,canvasH:1080};
+let activeVariation=null;
+document.querySelectorAll('.tab-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById('tab-'+btn.dataset.tab).classList.add('active');});});
+document.getElementById('bgInput').addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{const img=new Image();img.onload=()=>{state.bgImg=img;const thumb=document.getElementById('bgThumb');thumb.src=ev.target.result;thumb.style.display='block';document.querySelector('#bgZone p').textContent=file.name;};img.src=ev.target.result;};reader.readAsDataURL(file);});
+document.getElementById('logoInput').addEventListener('change',e=>{const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{const img=new Image();img.onload=()=>{state.logoImg=img;const thumb=document.getElementById('logoThumbSmall');thumb.src=ev.target.result;thumb.style.display='block';document.getElementById('logoLabel').textContent=file.name;};img.src=ev.target.result;};reader.readAsDataURL(file);});
+['headline','subtext','ctaText','logoText'].forEach(id=>{document.getElementById(id).addEventListener('input',e=>{state[id]=e.target.value;});});
+function setupColorRow(rowId,stateKey,customId){const row=document.getElementById(rowId);row.querySelectorAll('.color-swatch:not(.custom)').forEach(sw=>{sw.addEventListener('click',()=>{row.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));sw.classList.add('active');state[stateKey]=sw.dataset.color;});});if(customId){document.getElementById(customId).addEventListener('input',e=>{state[stateKey]=e.target.value;});}}
+setupColorRow('textColorRow','textColor','customTextColor');setupColorRow('ctaColorRow','ctaColor','customCtaColor');setupColorRow('ovColorRow','overlayColor','customOvColor');
+function setupPosGrid(gridId,stateKey){document.getElementById(gridId).querySelectorAll('.pos-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.getElementById(gridId).querySelectorAll('.pos-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');state[stateKey]=btn.dataset.pos;});});}
+setupPosGrid('posGrid','textPos');setupPosGrid('logoPosGrid','logoPos');
+document.getElementById('sizeRow').querySelectorAll('.size-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.size-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');state.canvasW=parseInt(btn.dataset.w);state.canvasH=parseInt(btn.dataset.h);});});
+[['logoSize','logoSizeVal','px'],['overlayOpacity','overlayVal','%'],['headlineSize','headlineSizeVal','px']].forEach(([id,outId,unit])=>{document.getElementById(id).addEventListener('input',e=>{state[id]=parseInt(e.target.value);document.getElementById(outId).textContent=e.target.value+unit;});});
+document.getElementById('fontSelect').addEventListener('change',e=>{state.fontFamily=e.target.value;});
+function hexToRgba(hex,alpha){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${alpha})`;}
+function getXY(pos,W,H,pad){const p=pad||48;const map={tl:[p,p],tc:[W/2,p],tr:[W-p,p],ml:[p,H/2],mc:[W/2,H/2],mr:[W-p,H/2],bl:[p,H-p],bc:[W/2,H-p],br:[W-p,H-p]};return map[pos]||[W/2,H/2];}
+function getAlign(pos){if(!pos)return'center';if(pos.endsWith('l'))return'left';if(pos.endsWith('r'))return'right';return'center';}
+function drawAd(canvas,s,v){const W=s.canvasW,H=s.canvasH;canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');if(s.bgImg){const scale=Math.max(W/s.bgImg.width,H/s.bgImg.height);const sw=s.bgImg.width*scale,sh=s.bgImg.height*scale;ctx.drawImage(s.bgImg,(W-sw)/2,(H-sh)/2,sw,sh);}else{ctx.fillStyle='#1a1a1a';ctx.fillRect(0,0,W,H);}const ovOpacity=v?Math.max(0,Math.min(0.9,(s.overlayOpacity+(v.opacityDelta||0))/100)):s.overlayOpacity/100;ctx.fillStyle=hexToRgba(v?(v.overlayColor||s.overlayColor):s.overlayColor,ovOpacity);ctx.fillRect(0,0,W,H);const textPos=s.textPos||'bc';const textAlign=getAlign(textPos);const headlineSize=Math.round(s.headlineSize*(v?(v.headlineScale||1):1));const fontFamily=s.fontFamily||'Arial';const textColor=v?(v.textColor||s.textColor):s.textColor;const ctaColor=v?(v.ctaColor||s.ctaColor):s.ctaColor;ctx.textAlign=textAlign;ctx.font=`bold ${headlineSize}px "${fontFamily}"`;const maxW=W*0.82;const words=s.headline.split(' ');let lines=[],cur='';words.forEach(w=>{const test=cur?cur+' '+w:w;if(ctx.measureText(test).width>maxW&&cur){lines.push(cur);cur=w;}else cur=test;});if(cur)lines.push(cur);const lineH=headlineSize*1.22;const subSize=Math.round(headlineSize*0.44);const btnH=Math.round(headlineSize*0.72);const totalBlockH=lines.length*lineH+(s.subtext?subSize*1.4:0)+(s.ctaText?btnH+20:0);let[tx,ty]=getXY(textPos,W,H,52);let baseY;if(textPos.startsWith('t'))baseY=ty+10;else if(textPos.startsWith('b'))baseY=ty-totalBlockH;else baseY=ty-totalBlockH/2;ctx.font=`bold ${headlineSize}px "${fontFamily}"`;ctx.fillStyle=textColor;lines.forEach((line,i)=>{ctx.shadowColor='rgba(0,0,0,0.55)';ctx.shadowBlur=10;ctx.fillText(line,tx,baseY+i*lineH+headlineSize);});ctx.shadowBlur=0;let cursorY=baseY+lines.length*lineH;if(s.subtext){ctx.font=`400 ${subSize}px "${fontFamily}"`;ctx.fillStyle=hexToRgba(textColor,0.82);cursorY+=subSize*0.2;ctx.fillText(s.subtext,tx,cursorY+subSize);cursorY+=subSize*1.4;}if(s.ctaText){const btnFontSize=Math.round(headlineSize*0.36);const btnPadX=Math.round(headlineSize*0.55);ctx.font=`600 ${btnFontSize}px "${fontFamily}"`;const btnW=ctx.measureText(s.ctaText).width+btnPadX*2;let btnX;if(textAlign==='center')btnX=tx-btnW/2;else if(textAlign==='left')btnX=tx;else btnX=tx-btnW;const btnY=cursorY+18;const r=btnH*0.44;ctx.beginPath();ctx.moveTo(btnX+r,btnY);ctx.lineTo(btnX+btnW-r,btnY);ctx.arcTo(btnX+btnW,btnY,btnX+btnW,btnY+btnH,r);ctx.lineTo(btnX+btnW,btnY+btnH-r);ctx.arcTo(btnX+btnW,btnY+btnH,btnX+btnW-r,btnY+btnH,r);ctx.lineTo(btnX+r,btnY+btnH);ctx.arcTo(btnX,btnY+btnH,btnX,btnY+btnH-r,r);ctx.lineTo(btnX,btnY+r);ctx.arcTo(btnX,btnY,btnX+r,btnY,r);ctx.closePath();ctx.fillStyle=ctaColor;ctx.fill();const ctaTc=['#FFFFFF','#FFE135'].includes(ctaColor)?'#0A0A0A':'#FFFFFF';ctx.fillStyle=ctaTc;ctx.textAlign='center';ctx.fillText(s.ctaText,btnX+btnW/2,btnY+btnH*0.64);ctx.textAlign=textAlign;}const logoPos=s.logoPos||'tl';const[lx,ly]=getXY(logoPos,W,H,36);const lAlign=getAlign(logoPos);ctx.textAlign=lAlign;if(s.logoImg){const lSize=s.logoSize;let drawX=lAlign==='left'?lx:lAlign==='right'?lx-lSize:lx-lSize/2;let drawY=logoPos.startsWith('t')?ly:logoPos.startsWith('b')?ly-lSize:ly-lSize/2;ctx.drawImage(s.logoImg,drawX,drawY,lSize,lSize);}else if(s.logoText){const lFontSize=Math.round(W*0.022);ctx.font=`700 ${lFontSize}px "${fontFamily}"`;ctx.fillStyle=textColor;let logoY=logoPos.startsWith('t')?ly+lFontSize:logoPos.startsWith('b')?ly-6:ly+lFontSize/2;ctx.fillText(s.logoText,lx,logoY);}ctx.textAlign='left';}
+function scaleCanvas(canvas){const area=document.getElementById('canvasArea');const maxW=area.clientWidth-64;const maxH=window.innerHeight-200;const scale=Math.min(maxW/state.canvasW,maxH/state.canvasH,1);canvas.style.width=Math.round(state.canvasW*scale)+'px';canvas.style.height=Math.round(state.canvasH*scale)+'px';}
+const varDefs=[{overlayColor:'#FF4D1C',opacityDelta:8,textColor:'#FFFFFF',ctaColor:'#0A0A0A'},{overlayColor:'#1C6EFF',opacityDelta:5,textColor:'#FFFFFF',ctaColor:'#FFE135',headlineScale:1.05},{overlayColor:'#0A0A0A',opacityDelta:-5,textColor:'#FFE135',ctaColor:'#FF4D1C',headlineScale:0.92},{overlayColor:'#1a4a1a',opacityDelta:10,textColor:'#FFFFFF',ctaColor:'#88dd44'},{overlayColor:'#4a1a4a',opacityDelta:8,textColor:'#FFE135',ctaColor:'#FF4D1C'}];
+function renderMain(variation){activeVariation=variation||null;const canvas=document.getElementById('mainCanvas');drawAd(canvas,state,activeVariation);scaleCanvas(canvas);}
+function renderVars(){const varRow=document.getElementById('varRow');varRow.querySelectorAll('.var-thumb').forEach(t=>t.remove());varDefs.forEach((v,i)=>{const wrap=document.createElement('div');wrap.className='var-thumb'+(i===0?' active':'');const c=document.createElement('canvas');drawAd(c,state,v);c.style.cssText='width:80px;height:80px;display:block;';wrap.appendChild(c);wrap.addEventListener('click',()=>{document.querySelectorAll('.var-thumb').forEach(t=>t.classList.remove('active'));wrap.classList.add('active');renderMain(v);});varRow.appendChild(wrap);});}
+document.getElementById('generateBtn').addEventListener('click',()=>{document.getElementById('emptyState').style.display='none';document.getElementById('canvasWrap').style.display='inline-block';document.getElementById('varRow').style.display='flex';document.getElementById('toolbar').style.display='flex';renderMain(null);renderVars();});
+document.getElementById('regenerateBtn').addEventListener('click',()=>renderMain(activeVariation));
+document.getElementById('varBtn').addEventListener('click',renderVars);
+document.getElementById('downloadBtn').addEventListener('click',()=>{const tmpCanvas=document.createElement('canvas');drawAd(tmpCanvas,state,activeVariation);const link=document.createElement('a');link.download=`ad_${state.canvasW}x${state.canvasH}.png`;link.href=tmpCanvas.toDataURL('image/png');link.click();});
+window.addEventListener('resize',()=>{const canvas=document.getElementById('mainCanvas');if(canvas.width>0)scaleCanvas(canvas);});
+</script>
+</body>
+</html>
