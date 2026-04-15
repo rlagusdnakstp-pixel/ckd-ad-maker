@@ -1,94 +1,580 @@
-export const config = { runtime: 'edge' };
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AD MAKER v3 — 광고 이미지 베리에이션 툴</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --c1: #0A0A0A; --c2: #F5F3EE; --c3: #E8E4DB;
+  --accent: #FF4D1C; --sidebar-w: 340px;
+}
+html, body { height: 100%; background: var(--c3); font-family: var(--font-body); color: var(--c1); overflow: hidden; }
+header { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: var(--c1); color: var(--c2); padding: 12px 24px; height: 48px; display: flex; align-items: center; justify-content: space-between; }
+header .logo { font-family: var(--font-display); font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+header .logo em { color: var(--accent); font-style: normal; }
+.badge { font-size: 10px; background: var(--accent); color: #fff; padding: 2px 7px; border-radius: 20px; font-weight: 600; margin-left: 8px; }
+header .hint { font-size: 11px; color: #666; }
+.realtime-dot { width: 6px; height: 6px; border-radius: 50%; background: #4caf50; display: inline-block; margin-right: 5px; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.layout { display: grid; grid-template-columns: var(--sidebar-w) 1fr; height: calc(100vh - 48px); margin-top: 48px; }
+.sidebar { background: var(--c1); color: var(--c2); display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #1f1f1f; }
+.sidebar-scroll { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.sidebar-scroll::-webkit-scrollbar { width: 4px; }
+.sidebar-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 
-export default async function handler(req) {
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
-  }
+/* AI SECTION */
+.ai-section { background: #111; border: 1px solid #2a2a2a; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ai-section-title { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--c2); display: flex; align-items: center; gap: 6px; }
+.ai-badge { font-size: 9px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 2px 6px; border-radius: 10px; font-weight: 600; }
+.url-input-row { display: flex; gap: 6px; }
+.url-input-row input { flex: 1; background: #1a1a1a; border: 0.5px solid #333; color: var(--c2); border-radius: 6px; padding: 8px 10px; font-size: 11px; font-family: var(--font-body); outline: none; transition: border-color 0.15s; }
+.url-input-row input:focus { border-color: #555; }
+.url-input-row input::placeholder { color: #444; }
+.btn-ai { padding: 8px 12px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 6px; font-size: 11px; font-family: var(--font-body); font-weight: 600; cursor: pointer; white-space: nowrap; transition: opacity 0.15s; }
+.btn-ai:hover { opacity: 0.88; }
+.btn-ai:disabled { opacity: 0.4; cursor: not-allowed; }
+.ai-status { font-size: 11px; color: #666; min-height: 16px; display: flex; align-items: center; gap: 6px; }
+.ai-status.loading { color: #888; }
+.ai-status.success { color: #4caf50; }
+.ai-status.error { color: #ff5252; }
+.spinner { width: 12px; height: 12px; border: 1.5px solid #444; border-top-color: #888; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; flex-shrink: 0; }
+.spinner.show { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-  const { url } = await req.json();
-  if (!url) return new Response(JSON.stringify({ error: 'URL required' }), { status: 400 });
+.sec-label { font-size: 9px; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; color: #555; margin-bottom: 6px; }
+.upload-zone { border: 1.5px dashed #333; border-radius: 8px; padding: 14px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; overflow: hidden; }
+.upload-zone:hover { border-color: #666; }
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-zone .icon { font-size: 18px; margin-bottom: 3px; }
+.upload-zone p { font-size: 11px; color: #666; line-height: 1.5; }
+.upload-thumb { width: 100%; height: 55px; object-fit: cover; border-radius: 5px; margin-bottom: 4px; display: none; }
+.tab-row { display: flex; gap: 3px; background: #161616; border-radius: 7px; padding: 3px; }
+.tab-btn { flex: 1; padding: 6px 2px; font-size: 10px; font-weight: 500; font-family: var(--font-body); border: none; background: transparent; color: #555; cursor: pointer; border-radius: 5px; transition: all 0.15s; }
+.tab-btn.active { background: var(--c2); color: var(--c1); }
+.tab-panel { display: none; flex-direction: column; gap: 10px; }
+.tab-panel.active { display: flex; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 10px; color: #555; font-weight: 500; letter-spacing: 0.3px; }
+.field input[type=text], .field select { background: #161616; border: 0.5px solid #2a2a2a; color: var(--c2); border-radius: 6px; padding: 7px 9px; font-size: 12px; font-family: var(--font-body); width: 100%; outline: none; transition: border-color 0.15s; }
+.field input:focus, .field select:focus { border-color: #444; }
+.field select option { background: #161616; }
+.slider-row { display: flex; align-items: center; gap: 8px; }
+.slider-row input[type=range] { flex: 1; accent-color: #888; cursor: pointer; }
+.slider-row .val { font-size: 11px; color: #666; min-width: 34px; text-align: right; }
+.pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.pos-btn { padding: 5px 2px; font-size: 10px; font-family: var(--font-body); border: 0.5px solid #2a2a2a; background: transparent; color: #555; border-radius: 4px; cursor: pointer; text-align: center; transition: all 0.12s; }
+.pos-btn.active { border-color: #777; color: var(--c2); background: #222; }
+.color-picker-wrap { display: flex; flex-direction: column; gap: 6px; }
+.color-presets { display: flex; flex-wrap: wrap; gap: 5px; }
+.cp-swatch { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.12s; flex-shrink: 0; position: relative; }
+.cp-swatch.active { border-color: #fff; transform: scale(1.15); }
+.cp-swatch.picker-swatch { background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); overflow: hidden; }
+.cp-swatch.picker-swatch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.hex-input-row { display: flex; align-items: center; gap: 6px; }
+.hex-preview { width: 20px; height: 20px; border-radius: 4px; border: 0.5px solid #333; flex-shrink: 0; }
+.hex-input-row input[type=text] { flex: 1; font-size: 11px; padding: 5px 8px; }
+.logo-upload { display: flex; align-items: center; gap: 8px; background: #161616; border: 0.5px solid #2a2a2a; border-radius: 6px; padding: 7px 9px; cursor: pointer; position: relative; overflow: hidden; transition: border-color 0.15s; }
+.logo-upload:hover { border-color: #444; }
+.logo-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.logo-upload span { font-size: 11px; color: #666; }
+.logo-preview-small { width: 22px; height: 22px; object-fit: contain; border-radius: 3px; display: none; }
+.size-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.size-btn { padding: 7px 4px; font-size: 10px; font-family: var(--font-body); border: 0.5px solid #2a2a2a; background: transparent; color: #666; border-radius: 5px; cursor: pointer; text-align: center; transition: all 0.15s; line-height: 1.4; }
+.size-btn small { display: block; font-size: 9px; color: #444; }
+.size-btn.active { border-color: #777; color: var(--c2); background: #1e1e1e; }
+.size-btn.active small { color: #888; }
+.divider { border: none; border-top: 0.5px solid #1e1e1e; margin: 2px 0; }
+.btn-gen { margin: 0 16px 16px; padding: 12px; font-family: var(--font-display); font-size: 13px; font-weight: 700; background: var(--accent); color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.15s, transform 0.1s; letter-spacing: 0.3px; flex-shrink: 0; }
+.btn-gen:hover { opacity: 0.88; }
+.btn-gen:active { transform: scale(0.98); }
+.canvas-area { background: var(--c3); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 16px; position: relative; overflow: hidden; }
+.canvas-wrap { position: relative; display: inline-block; box-shadow: 0 16px 64px rgba(0,0,0,0.2); border-radius: 4px; overflow: hidden; }
+canvas { display: block; }
+.handle { position: absolute; cursor: move; border: 1.5px dashed rgba(255,255,255,0.6); border-radius: 3px; pointer-events: all; transition: border-color 0.15s; min-width: 20px; min-height: 14px; }
+.handle:hover { border-color: rgba(255,255,255,1); }
+.handle.selected { border-color: var(--accent); border-style: solid; }
+.handle-label { position: absolute; top: -18px; left: 0; font-size: 9px; font-weight: 600; letter-spacing: 1px; background: var(--accent); color: #fff; padding: 2px 5px; border-radius: 3px; white-space: nowrap; display: none; pointer-events: none; }
+.handle.selected .handle-label { display: block; }
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 12px; color: #9a9690; text-align: center; pointer-events: none; }
+.empty-state .big-icon { font-size: 56px; opacity: 0.3; }
+.empty-state h2 { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: #888; }
+.empty-state p { font-size: 13px; line-height: 1.7; max-width: 240px; }
+.var-section { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.var-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #9a9690; }
+.var-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.var-thumb { width: 72px; height: 72px; border-radius: 7px; cursor: pointer; border: 2px solid transparent; overflow: hidden; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.12); flex-shrink: 0; }
+.var-thumb:hover { transform: translateY(-2px); }
+.var-thumb.active { border-color: var(--accent); }
+.var-thumb canvas { width: 100%; height: 100%; display: block; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.tool-btn { padding: 8px 16px; font-size: 12px; font-family: var(--font-body); font-weight: 500; border: 1px solid #c8c3b8; background: var(--c2); color: var(--c1); border-radius: 7px; cursor: pointer; transition: all 0.15s; }
+.tool-btn:hover { background: #fff; }
+.tool-btn.primary { background: var(--c1); color: var(--c2); border-color: var(--c1); }
+.tool-btn.primary:hover { opacity: 0.85; }
+@media (max-width: 900px) { :root { --sidebar-w: 280px; } html, body { overflow: auto; } .layout { grid-template-columns: 1fr; height: auto; } .sidebar { max-height: 60vh; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">AD <em>MAKER</em> <span class="badge">v3</span></div>
+  <div class="hint"><span class="realtime-dot"></span>실시간 미리보기</div>
+</header>
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) return new Response(JSON.stringify({ error: 'API key not set' }), { status: 500 });
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-scroll">
 
-  // 1. 페이지 HTML 가져오기
-  let pageText = '';
-  let imageUrl = '';
-  try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AdMakerBot/1.0)' }
+      <!-- AI 자동 생성 -->
+      <div class="ai-section">
+        <div class="ai-section-title">✦ AI 자동 생성 <span class="ai-badge">GEMINI</span></div>
+        <div class="url-input-row">
+          <input type="text" id="productUrl" placeholder="제품 URL을 붙여넣으세요">
+          <button class="btn-ai" id="analyzeBtn">분석</button>
+        </div>
+        <div class="ai-status" id="aiStatus">
+          <div class="spinner" id="spinner"></div>
+          <span id="aiStatusText">URL 입력 후 분석 버튼을 눌러보세요</span>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- 배경 이미지 -->
+      <div>
+        <div class="sec-label">배경 이미지</div>
+        <div class="upload-zone" id="bgZone">
+          <input type="file" accept="image/*" id="bgInput">
+          <img class="upload-thumb" id="bgThumb">
+          <div class="icon">🖼</div>
+          <p>클릭 또는 드래그해서 업로드</p>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="tab-row">
+        <button class="tab-btn active" data-tab="headline">헤드라인</button>
+        <button class="tab-btn" data-tab="sub">서브텍스트</button>
+        <button class="tab-btn" data-tab="cta">CTA</button>
+        <button class="tab-btn" data-tab="logo">로고</button>
+        <button class="tab-btn" data-tab="style">스타일</button>
+      </div>
+
+      <!-- 헤드라인 탭 -->
+      <div class="tab-panel active" id="tab-headline">
+        <div class="field"><label>헤드라인 텍스트</label><input type="text" id="headline" value="지금 바로 시작하세요!"></div>
+        <div class="field"><label>폰트 크기</label><div class="slider-row"><input type="range" min="16" max="120" value="48" id="headlineSize" step="1"><span class="val" id="headlineSizeVal">48px</span></div></div>
+        <div class="field"><label>텍스트 색상</label><div class="color-picker-wrap" id="textColorPicker"></div></div>
+        <div class="field"><label>위치 (드래그도 가능)</label>
+          <div class="pos-grid" id="headlinePosGrid">
+            <button class="pos-btn" data-pos="tl">↖</button><button class="pos-btn" data-pos="tc">↑</button><button class="pos-btn" data-pos="tr">↗</button>
+            <button class="pos-btn" data-pos="ml">←</button><button class="pos-btn" data-pos="mc">●</button><button class="pos-btn" data-pos="mr">→</button>
+            <button class="pos-btn" data-pos="bl">↙</button><button class="pos-btn active" data-pos="bc">↓</button><button class="pos-btn" data-pos="br">↘</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 서브텍스트 탭 -->
+      <div class="tab-panel" id="tab-sub">
+        <div class="field"><label>서브 텍스트</label><input type="text" id="subtext" value="특별 할인 최대 50%"></div>
+        <div class="field"><label>폰트 크기</label><div class="slider-row"><input type="range" min="10" max="60" value="22" id="subSize" step="1"><span class="val" id="subSizeVal">22px</span></div></div>
+        <div class="field"><label>텍스트 색상</label><div class="color-picker-wrap" id="subColorPicker"></div></div>
+        <div class="field"><label>위치 (드래그도 가능)</label>
+          <div class="pos-grid" id="subPosGrid">
+            <button class="pos-btn" data-pos="tl">↖</button><button class="pos-btn" data-pos="tc">↑</button><button class="pos-btn" data-pos="tr">↗</button>
+            <button class="pos-btn" data-pos="ml">←</button><button class="pos-btn" data-pos="mc">●</button><button class="pos-btn" data-pos="mr">→</button>
+            <button class="pos-btn" data-pos="bl">↙</button><button class="pos-btn active" data-pos="bc">↓</button><button class="pos-btn" data-pos="br">↘</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA 탭 -->
+      <div class="tab-panel" id="tab-cta">
+        <div class="field"><label>CTA 텍스트</label><input type="text" id="ctaText" value="지금 구매하기"></div>
+        <div class="field"><label>버튼 크기</label><div class="slider-row"><input type="range" min="10" max="60" value="20" id="ctaSize" step="1"><span class="val" id="ctaSizeVal">20px</span></div></div>
+        <div class="field"><label>버튼 배경색</label><div class="color-picker-wrap" id="ctaBgColorPicker"></div></div>
+        <div class="field"><label>버튼 텍스트 색상</label><div class="color-picker-wrap" id="ctaTextColorPicker"></div></div>
+        <div class="field"><label>위치 (드래그도 가능)</label>
+          <div class="pos-grid" id="ctaPosGrid">
+            <button class="pos-btn" data-pos="tl">↖</button><button class="pos-btn" data-pos="tc">↑</button><button class="pos-btn" data-pos="tr">↗</button>
+            <button class="pos-btn" data-pos="ml">←</button><button class="pos-btn" data-pos="mc">●</button><button class="pos-btn" data-pos="mr">→</button>
+            <button class="pos-btn" data-pos="bl">↙</button><button class="pos-btn active" data-pos="bc">↓</button><button class="pos-btn" data-pos="br">↘</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 로고 탭 -->
+      <div class="tab-panel" id="tab-logo">
+        <div class="field"><label>로고 이미지</label>
+          <label class="logo-upload"><input type="file" accept="image/*" id="logoInput"><img class="logo-preview-small" id="logoThumbSmall"><span id="logoLabel">로고 파일 선택</span></label>
+        </div>
+        <div class="field"><label>로고 텍스트 (이미지 없을 때)</label><input type="text" id="logoText" value="BRAND"></div>
+        <div class="field"><label>로고 크기</label><div class="slider-row"><input type="range" min="30" max="300" value="80" id="logoSize" step="1"><span class="val" id="logoSizeVal">80px</span></div></div>
+        <div class="field"><label>위치 (드래그도 가능)</label>
+          <div class="pos-grid" id="logoPosGrid">
+            <button class="pos-btn active" data-pos="tl">↖</button><button class="pos-btn" data-pos="tc">↑</button><button class="pos-btn" data-pos="tr">↗</button>
+            <button class="pos-btn" data-pos="ml">←</button><button class="pos-btn" data-pos="mc">●</button><button class="pos-btn" data-pos="mr">→</button>
+            <button class="pos-btn" data-pos="bl">↙</button><button class="pos-btn" data-pos="bc">↓</button><button class="pos-btn" data-pos="br">↘</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 스타일 탭 -->
+      <div class="tab-panel" id="tab-style">
+        <div class="field"><label>광고 형식</label>
+          <div class="size-grid" id="sizeGrid">
+            <button class="size-btn active" data-w="1080" data-h="1080">1:1<br><small>인스타</small></button>
+            <button class="size-btn" data-w="1080" data-h="1920">9:16<br><small>스토리</small></button>
+            <button class="size-btn" data-w="1200" data-h="628">1.91:1<br><small>피드</small></button>
+            <button class="size-btn" data-w="728" data-h="90">배너<br><small>가로형</small></button>
+            <button class="size-btn" data-w="300" data-h="250">사각<br><small>디스플레이</small></button>
+            <button class="size-btn" data-w="1080" data-h="566">와이드<br><small>카드뉴스</small></button>
+          </div>
+        </div>
+        <div class="field"><label>오버레이 색상</label><div class="color-picker-wrap" id="overlayColorPicker"></div></div>
+        <div class="field"><label>오버레이 불투명도</label><div class="slider-row"><input type="range" min="0" max="95" value="35" id="overlayOpacity" step="1"><span class="val" id="overlayVal">35%</span></div></div>
+        <div class="field"><label>글꼴</label>
+          <select id="fontSelect">
+            <option value="Arial">Arial</option><option value="Georgia">Georgia</option>
+            <option value="Verdana">Verdana</option><option value="Trebuchet MS">Trebuchet MS</option>
+            <option value="Courier New">Courier New</option><option value="Impact">Impact</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+    <button class="btn-gen" id="generateBtn">광고 생성 + 베리에이션 →</button>
+  </div>
+
+  <!-- 캔버스 영역 -->
+  <div class="canvas-area" id="canvasArea">
+    <div class="empty-state" id="emptyState">
+      <div class="big-icon">✦</div>
+      <h2>AD MAKER v3</h2>
+      <p>제품 URL을 입력하면<br>AI가 카피를 자동으로 만들어줘요</p>
+    </div>
+    <div id="canvasWrap" class="canvas-wrap" style="display:none"><canvas id="mainCanvas"></canvas></div>
+    <div class="var-section" id="varSection" style="display:none">
+      <div class="var-label">베리에이션</div>
+      <div class="var-row" id="varRow"></div>
+    </div>
+    <div class="toolbar" id="toolbar" style="display:none">
+      <button class="tool-btn" id="varBtn">+ 베리에이션</button>
+      <button class="tool-btn primary" id="downloadBtn">↓ 다운로드</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const S = {
+  bgImg:null, logoImg:null,
+  headline:'지금 바로 시작하세요!', subtext:'특별 할인 최대 50%',
+  ctaText:'지금 구매하기', logoText:'BRAND',
+  headlineSize:48, subSize:22, ctaSize:20, logoSize:80,
+  textColor:'#FFFFFF', subColor:'#FFFFFF',
+  ctaBgColor:'#FF4D1C', ctaTextColor:'#FFFFFF',
+  overlayColor:'#0A0A0A', overlayOpacity:35,
+  fontFamily:'Arial', canvasW:1080, canvasH:1080,
+  headlinePos:{x:0.5,y:0.82}, subPos:{x:0.5,y:0.88},
+  ctaPos:{x:0.5,y:0.94}, logoPos:{x:0.1,y:0.06},
+};
+let activeVariation=null, liveMode=false, SCALE=1;
+
+const COLORS=['#FFFFFF','#F5F3EE','#FFE135','#FFA500','#FF4D1C','#FF0080','#E91E63','#9C27B0','#673AB7','#3F51B5','#1C6EFF','#03A9F4','#00BCD4','#009688','#4CAF50','#8BC34A','#CDDC39','#FFEB3B','#FF9800','#FF5722','#795548','#9E9E9E','#607D8B','#0A0A0A'];
+
+function buildColorPicker(containerId, stateKey, defaultColor) {
+  const wrap = document.getElementById(containerId);
+  wrap.innerHTML = '';
+  const presets = document.createElement('div');
+  presets.className = 'color-presets';
+  let hexInput, hexPreview;
+  COLORS.forEach(c => {
+    const sw = document.createElement('div');
+    sw.className = 'cp-swatch' + (c===defaultColor?' active':'');
+    sw.style.background = c;
+    if (c==='#FFFFFF'||c==='#F5F3EE') sw.style.border='2px solid #444';
+    sw.addEventListener('click', () => {
+      presets.querySelectorAll('.cp-swatch').forEach(s=>s.classList.remove('active'));
+      sw.classList.add('active'); S[stateKey]=c;
+      hexInput.value=c.toUpperCase(); hexPreview.style.background=c;
+      if(liveMode) liveRender();
     });
-    const html = await res.text();
-
-    // 텍스트 추출 (태그 제거)
-    pageText = html
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 3000);
-
-    // og:image 추출
-    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
-      || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-    if (ogImageMatch) imageUrl = ogImageMatch[1];
-
-    // og:image 없으면 첫 번째 큰 이미지 찾기
-    if (!imageUrl) {
-      const imgMatch = html.match(/<img[^>]*src=["']([^"']*(?:product|main|hero|banner|thumb)[^"']*)["']/i)
-        || html.match(/<img[^>]*src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp))["']/i);
-      if (imgMatch) imageUrl = imgMatch[1];
+    presets.appendChild(sw);
+  });
+  const pickerSw = document.createElement('div');
+  pickerSw.className = 'cp-swatch picker-swatch';
+  const pickerInput = document.createElement('input');
+  pickerInput.type='color'; pickerInput.value=defaultColor;
+  pickerInput.addEventListener('input', e => {
+    S[stateKey]=e.target.value;
+    if(hexInput) { hexInput.value=e.target.value.toUpperCase(); hexPreview.style.background=e.target.value; }
+    if(liveMode) liveRender();
+  });
+  pickerSw.appendChild(pickerInput); presets.appendChild(pickerSw);
+  wrap.appendChild(presets);
+  const hexRow = document.createElement('div');
+  hexRow.className = 'hex-input-row';
+  hexPreview = document.createElement('div');
+  hexPreview.className = 'hex-preview'; hexPreview.style.background = defaultColor;
+  hexInput = document.createElement('input');
+  hexInput.type='text'; hexInput.value=defaultColor.toUpperCase(); hexInput.placeholder='#FFFFFF';
+  hexInput.addEventListener('input', e => {
+    if(/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
+      S[stateKey]=e.target.value; hexPreview.style.background=e.target.value;
+      if(liveMode) liveRender();
     }
+  });
+  hexRow.appendChild(hexPreview); hexRow.appendChild(hexInput);
+  wrap.appendChild(hexRow);
+}
 
-    // 상대경로면 절대경로로 변환
-    if (imageUrl && imageUrl.startsWith('/')) {
-      const base = new URL(url);
-      imageUrl = base.origin + imageUrl;
-    }
+buildColorPicker('textColorPicker','textColor','#FFFFFF');
+buildColorPicker('subColorPicker','subColor','#FFFFFF');
+buildColorPicker('ctaBgColorPicker','ctaBgColor','#FF4D1C');
+buildColorPicker('ctaTextColorPicker','ctaTextColor','#FFFFFF');
+buildColorPicker('overlayColorPicker','overlayColor','#0A0A0A');
 
-  } catch (e) {
-    pageText = `URL: ${url}`;
-  }
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
 
-  // 2. Gemini API로 카피 생성
-  const prompt = `다음은 제품 페이지의 내용이에요. 이 제품을 위한 광고 카피를 한국어로 만들어주세요.
+document.getElementById('bgInput').addEventListener('change', e => {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{ S.bgImg=img; document.getElementById('bgThumb').src=ev.target.result; document.getElementById('bgThumb').style.display='block'; document.querySelector('#bgZone p').textContent=file.name; if(liveMode) liveRender(); };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
 
-페이지 내용:
-${pageText}
+document.getElementById('logoInput').addEventListener('change', e => {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{ S.logoImg=img; document.getElementById('logoThumbSmall').src=ev.target.result; document.getElementById('logoThumbSmall').style.display='block'; document.getElementById('logoLabel').textContent=file.name; if(liveMode) liveRender(); };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
 
-아래 JSON 형식으로만 답해주세요. 다른 텍스트는 절대 포함하지 마세요:
-{
-  "headline": "짧고 강렬한 헤드라인 (20자 이내)",
-  "subtext": "혜택을 강조하는 서브텍스트 (30자 이내)",
-  "cta": "행동을 유도하는 CTA 버튼 텍스트 (10자 이내)",
-  "brand": "브랜드명 또는 제품명 (15자 이내)"
-}`;
+['headline','subtext','ctaText','logoText'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', e=>{ S[id]=e.target.value; if(liveMode) liveRender(); });
+});
 
-  try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 256 }
-        })
-      }
-    );
+[['headlineSize','headlineSizeVal','px'],['subSize','subSizeVal','px'],['ctaSize','ctaSizeVal','px'],['logoSize','logoSizeVal','px'],['overlayOpacity','overlayVal','%']].forEach(([id,outId,unit])=>{
+  document.getElementById(id).addEventListener('input', e=>{ S[id]=parseInt(e.target.value); document.getElementById(outId).textContent=e.target.value+unit; if(liveMode) liveRender(); });
+});
+document.getElementById('fontSelect').addEventListener('change', e=>{ S.fontFamily=e.target.value; if(liveMode) liveRender(); });
 
-    const geminiData = await geminiRes.json();
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    const clean = rawText.replace(/```json|```/g, '').trim();
-    const copy = JSON.parse(clean);
-
-    return new Response(JSON.stringify({ copy, imageUrl }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+const posMap={tl:{x:0.1,y:0.08},tc:{x:0.5,y:0.08},tr:{x:0.9,y:0.08},ml:{x:0.1,y:0.5},mc:{x:0.5,y:0.5},mr:{x:0.9,y:0.5},bl:{x:0.1,y:0.88},bc:{x:0.5,y:0.88},br:{x:0.9,y:0.88}};
+function setupPosGrid(gridId, posKey) {
+  document.getElementById(gridId).querySelectorAll('.pos-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.getElementById(gridId).querySelectorAll('.pos-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); S[posKey]={...posMap[btn.dataset.pos]};
+      if(liveMode){ liveRender(); updateHandles(); }
     });
+  });
+}
+setupPosGrid('headlinePosGrid','headlinePos'); setupPosGrid('subPosGrid','subPos');
+setupPosGrid('ctaPosGrid','ctaPos'); setupPosGrid('logoPosGrid','logoPos');
 
-  } catch (e) {
-    return new Response(JSON.stringify({ error: 'AI 카피 생성 실패: ' + e.message }), { status: 500 });
+document.getElementById('sizeGrid').querySelectorAll('.size-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.size-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active'); S.canvasW=parseInt(btn.dataset.w); S.canvasH=parseInt(btn.dataset.h);
+    if(liveMode){ liveRender(); updateHandles(); }
+  });
+});
+
+// AI 분석
+document.getElementById('analyzeBtn').addEventListener('click', async () => {
+  const url = document.getElementById('productUrl').value.trim();
+  if(!url) return;
+  const btn=document.getElementById('analyzeBtn');
+  const spinner=document.getElementById('spinner');
+  const statusEl=document.getElementById('aiStatus');
+  const statusText=document.getElementById('aiStatusText');
+  btn.disabled=true; spinner.classList.add('show');
+  statusEl.className='ai-status loading'; statusText.textContent='AI가 제품을 분석하고 있어요...';
+  try {
+    const res = await fetch('/api/scrape', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url})
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    const {copy, imageUrl} = data;
+    if(copy.headline){ S.headline=copy.headline; document.getElementById('headline').value=copy.headline; }
+    if(copy.subtext){  S.subtext=copy.subtext;   document.getElementById('subtext').value=copy.subtext; }
+    if(copy.cta){      S.ctaText=copy.cta;        document.getElementById('ctaText').value=copy.cta; }
+    if(copy.brand){    S.logoText=copy.brand;     document.getElementById('logoText').value=copy.brand; }
+    if(imageUrl){
+      const img=new Image(); img.crossOrigin='anonymous';
+      img.onload=()=>{ S.bgImg=img; if(liveMode) liveRender(); };
+      img.src=imageUrl;
+      document.getElementById('bgThumb').src=imageUrl;
+      document.getElementById('bgThumb').style.display='block';
+      document.querySelector('#bgZone p').textContent='제품 이미지 자동 적용됨';
+    }
+    statusEl.className='ai-status success'; statusText.textContent='✓ 카피 자동 생성 완료!';
+    if(!liveMode){
+      liveMode=true;
+      document.getElementById('emptyState').style.display='none';
+      document.getElementById('canvasWrap').style.display='inline-block';
+      document.getElementById('varSection').style.display='flex';
+      document.getElementById('toolbar').style.display='flex';
+    }
+    liveRender(null); renderVariations();
+  } catch(e) {
+    statusEl.className='ai-status error'; statusText.textContent='오류: '+e.message;
+  } finally {
+    btn.disabled=false; spinner.classList.remove('show');
+  }
+});
+
+function hexToRgba(hex,alpha){ const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); return `rgba(${r},${g},${b},${alpha})`; }
+function getAlign(fx){ return fx<0.35?'left':fx>0.65?'right':'center'; }
+
+function drawAd(canvas,s,v){
+  const W=s.canvasW,H=s.canvasH;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  if(s.bgImg){ const sc=Math.max(W/s.bgImg.width,H/s.bgImg.height); const sw=s.bgImg.width*sc,sh=s.bgImg.height*sc; ctx.drawImage(s.bgImg,(W-sw)/2,(H-sh)/2,sw,sh); }
+  else{ ctx.fillStyle='#1a1a1a'; ctx.fillRect(0,0,W,H); }
+  const ovA=Math.max(0,Math.min(0.95,(s.overlayOpacity+(v?.opacityDelta||0))/100));
+  ctx.fillStyle=hexToRgba(v?.overlayColor||s.overlayColor,ovA); ctx.fillRect(0,0,W,H);
+  const font=s.fontFamily||'Arial';
+  function drawText(text,size,color,pos,weight){
+    if(!text) return;
+    ctx.textAlign=getAlign(pos.x); ctx.font=`${weight||'bold'} ${size}px "${font}"`;
+    ctx.fillStyle=color; ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8;
+    ctx.fillText(text,pos.x*W,pos.y*H); ctx.shadowBlur=0;
+  }
+  drawText(s.headline,s.headlineSize*(v?.headlineScale||1),v?.textColor||s.textColor,s.headlinePos,'bold');
+  drawText(s.subtext,s.subSize,v?.subColor||s.subColor,s.subPos,'400');
+  if(s.ctaText){
+    const fs=s.ctaSize,ctaBg=v?.ctaBgColor||s.ctaBgColor,ctaTc=v?.ctaTextColor||s.ctaTextColor;
+    ctx.font=`600 ${fs}px "${font}"`;
+    const tw=ctx.measureText(s.ctaText).width,padX=fs*1.2,padY=fs*0.55;
+    const bw=tw+padX*2,bh=fs+padY*2,px=s.ctaPos.x*W,py=s.ctaPos.y*H;
+    const align=getAlign(s.ctaPos.x);
+    let bx=align==='center'?px-bw/2:align==='left'?px:px-bw;
+    const by=py-bh/2,r=bh*0.4;
+    ctx.beginPath(); ctx.moveTo(bx+r,by); ctx.lineTo(bx+bw-r,by); ctx.arcTo(bx+bw,by,bx+bw,by+bh,r);
+    ctx.lineTo(bx+bw,by+bh-r); ctx.arcTo(bx+bw,by+bh,bx+bw-r,by+bh,r);
+    ctx.lineTo(bx+r,by+bh); ctx.arcTo(bx,by+bh,bx,by+bh-r,r);
+    ctx.lineTo(bx,by+r); ctx.arcTo(bx,by,bx+r,by,r); ctx.closePath();
+    ctx.fillStyle=ctaBg; ctx.fill();
+    ctx.fillStyle=ctaTc; ctx.textAlign='center';
+    ctx.fillText(s.ctaText,bx+bw/2,by+bh*0.65);
+  }
+  ctx.textAlign='left';
+  const lx=s.logoPos.x*W,ly=s.logoPos.y*H,lAlign=getAlign(s.logoPos.x);
+  if(s.logoImg){
+    const lSz=s.logoSize,dx=lAlign==='left'?lx:lAlign==='right'?lx-lSz:lx-lSz/2;
+    ctx.drawImage(s.logoImg,dx,ly-lSz/2,lSz,lSz);
+  } else if(s.logoText){
+    const lfs=Math.round(s.logoSize*0.28);
+    ctx.font=`700 ${lfs}px "${font}"`; ctx.textAlign=lAlign;
+    ctx.fillStyle=v?.textColor||s.textColor; ctx.fillText(s.logoText,lx,ly);
   }
 }
+
+function scaleCanvas(canvas){
+  const area=document.getElementById('canvasArea');
+  const maxW=area.clientWidth-48,maxH=area.clientHeight-180;
+  SCALE=Math.min(maxW/S.canvasW,maxH/S.canvasH,1);
+  canvas.style.width=Math.round(S.canvasW*SCALE)+'px';
+  canvas.style.height=Math.round(S.canvasH*SCALE)+'px';
+}
+
+const ELEMENTS=[{key:'headlinePos',label:'헤드라인'},{key:'subPos',label:'서브텍스트'},{key:'ctaPos',label:'CTA'},{key:'logoPos',label:'로고'}];
+function updateHandles(){
+  const wrap=document.getElementById('canvasWrap');
+  wrap.querySelectorAll('.handle').forEach(h=>h.remove());
+  const cw=S.canvasW*SCALE,ch=S.canvasH*SCALE;
+  ELEMENTS.forEach(el=>{
+    const handle=document.createElement('div');
+    handle.className='handle'; handle.dataset.key=el.key;
+    const label=document.createElement('div');
+    label.className='handle-label'; label.textContent=el.label;
+    handle.appendChild(label);
+    const pos=S[el.key];
+    handle.style.left=(pos.x*cw-30)+'px'; handle.style.top=(pos.y*ch-12)+'px';
+    handle.style.width='60px'; handle.style.height='24px';
+    let startX,startY,startPX,startPY;
+    handle.addEventListener('mousedown', e=>{
+      e.preventDefault(); handle.classList.add('selected');
+      startX=e.clientX; startY=e.clientY; startPX=S[el.key].x; startPY=S[el.key].y;
+      const onMove=e=>{ S[el.key]={x:Math.max(0.02,Math.min(0.98,startPX+(e.clientX-startX)/cw)),y:Math.max(0.02,Math.min(0.98,startPY+(e.clientY-startY)/ch))}; liveRender(); updateHandles(); handle.classList.add('selected'); };
+      const onUp=()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); };
+      document.addEventListener('mousemove',onMove); document.addEventListener('mouseup',onUp);
+    });
+    wrap.appendChild(handle);
+  });
+}
+
+function liveRender(variation){
+  if(variation!==undefined) activeVariation=variation;
+  const canvas=document.getElementById('mainCanvas');
+  drawAd(canvas,S,activeVariation); scaleCanvas(canvas); updateHandles();
+}
+
+const varDefs=[
+  {overlayColor:'#FF4D1C',opacityDelta:8,textColor:'#FFFFFF',subColor:'#FFFFFF',ctaBgColor:'#0A0A0A',ctaTextColor:'#FFFFFF'},
+  {overlayColor:'#1C6EFF',opacityDelta:5,textColor:'#FFFFFF',subColor:'#FFE135',ctaBgColor:'#FFE135',ctaTextColor:'#0A0A0A',headlineScale:1.05},
+  {overlayColor:'#0A0A0A',opacityDelta:-5,textColor:'#FFE135',subColor:'#FFFFFF',ctaBgColor:'#FF4D1C',ctaTextColor:'#FFFFFF'},
+  {overlayColor:'#1a4a1a',opacityDelta:10,textColor:'#FFFFFF',subColor:'#CCFF44',ctaBgColor:'#66DD22',ctaTextColor:'#0A0A0A'},
+  {overlayColor:'#3a1a4a',opacityDelta:8,textColor:'#FFE135',subColor:'#FF80CC',ctaBgColor:'#FF4D1C',ctaTextColor:'#FFFFFF'},
+];
+
+function renderVariations(){
+  const varRow=document.getElementById('varRow');
+  varRow.querySelectorAll('.var-thumb').forEach(t=>t.remove());
+  varDefs.forEach((v,i)=>{
+    const wrap=document.createElement('div');
+    wrap.className='var-thumb'+(i===0?' active':'');
+    const c=document.createElement('canvas');
+    drawAd(c,S,v); c.style.cssText='width:72px;height:72px;display:block;';
+    wrap.appendChild(c);
+    wrap.addEventListener('click',()=>{ document.querySelectorAll('.var-thumb').forEach(t=>t.classList.remove('active')); wrap.classList.add('active'); liveRender(v); });
+    varRow.appendChild(wrap);
+  });
+}
+
+document.getElementById('generateBtn').addEventListener('click', ()=>{
+  liveMode=true;
+  document.getElementById('emptyState').style.display='none';
+  document.getElementById('canvasWrap').style.display='inline-block';
+  document.getElementById('varSection').style.display='flex';
+  document.getElementById('toolbar').style.display='flex';
+  activeVariation=null; liveRender(null); renderVariations();
+});
+
+document.getElementById('varBtn').addEventListener('click', renderVariations);
+document.getElementById('downloadBtn').addEventListener('click', ()=>{
+  const tmp=document.createElement('canvas');
+  drawAd(tmp,S,activeVariation);
+  const a=document.createElement('a');
+  a.download=`ad_${S.canvasW}x${S.canvasH}.png`;
+  a.href=tmp.toDataURL('image/png'); a.click();
+});
+window.addEventListener('resize',()=>{ if(liveMode){ scaleCanvas(document.getElementById('mainCanvas')); updateHandles(); } });
+</script>
+</body>
+</html>
