@@ -405,6 +405,7 @@ document.getElementById('sizeGrid').querySelectorAll('.size-btn').forEach(btn=>{
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
   const url = document.getElementById('productUrl').value.trim();
   if(!url) return;
+  currentProductUrl = url;
   const btn=document.getElementById('analyzeBtn');
   const spinner=document.getElementById('spinner');
   const statusEl=document.getElementById('aiStatus');
@@ -550,138 +551,148 @@ function liveRender(variation){
   drawAd(canvas,S,activeVariation); scaleCanvas(canvas); updateHandles();
 }
 
-// 베리에이션 컨셉 정의 - 각각 다른 이미지 + 카피 스타일
+// 베리에이션 컨셉 - 각각 다른 카피 톤 + 배경 스타일
 const varConcepts = [
-  { label:'미니멀', bgStyle:'clean minimal white background, soft shadows, elegant product photography, studio light', overlayColor:'#FFFFFF', overlayOpacity:20, textColor:'#0A0A0A', subColor:'#444444', ctaBgColor:'#0A0A0A', ctaTextColor:'#FFFFFF', headlineSuffix:'— 심플하게', ctaSuffix:'지금 확인' },
-  { label:'럭셔리', bgStyle:'dark luxury background, gold bokeh lights, premium product photography, cinematic', overlayColor:'#0A0A0A', overlayOpacity:40, textColor:'#FFE135', subColor:'#FFFFFF', ctaBgColor:'#FFE135', ctaTextColor:'#0A0A0A', headlineSuffix:'— 프리미엄', ctaSuffix:'프리미엄 구매' },
-  { label:'다이나믹', bgStyle:'energetic vibrant background, dynamic diagonal lines, bold colors, sports advertisement style', overlayColor:'#FF4D1C', overlayOpacity:45, textColor:'#FFFFFF', subColor:'#FFE135', ctaBgColor:'#0A0A0A', ctaTextColor:'#FFFFFF', headlineSuffix:'— 지금 바로!', ctaSuffix:'바로 구매' },
-  { label:'자연', bgStyle:'natural organic background, soft green tones, nature elements, fresh and clean', overlayColor:'#1a4a1a', overlayOpacity:40, textColor:'#FFFFFF', subColor:'#CCFF88', ctaBgColor:'#4CAF50', ctaTextColor:'#FFFFFF', headlineSuffix:'— 자연그대로', ctaSuffix:'자연 구매' },
-  { label:'모던', bgStyle:'modern tech background, geometric patterns, blue gradient, futuristic digital', overlayColor:'#1C3EFF', overlayOpacity:45, textColor:'#FFFFFF', subColor:'#88DDFF', ctaBgColor:'#FFFFFF', ctaTextColor:'#1C3EFF', headlineSuffix:'— 스마트하게', ctaSuffix:'스마트 구매' },
+  { label:'미니멀', tone:'심플하고 깔끔한 톤으로, 간결하게', bgStyle:'clean minimal white studio background, soft shadows, elegant' },
+  { label:'럭셔리', tone:'고급스럽고 프리미엄한 톤으로, 가치를 강조하며', bgStyle:'dark luxury background, gold bokeh lights, cinematic premium' },
+  { label:'다이나믹', tone:'강렬하고 역동적인 톤으로, 즉시 구매를 유도하며', bgStyle:'energetic vibrant background, bold colors, dynamic' },
+  { label:'자연', tone:'자연스럽고 건강한 톤으로, 신뢰감을 주며', bgStyle:'natural organic background, soft green tones, fresh clean' },
+  { label:'모던', tone:'스마트하고 현대적인 톤으로, 혁신을 강조하며', bgStyle:'modern tech background, geometric patterns, blue futuristic' },
 ];
 
-let varStates = []; // 각 베리에이션의 전체 상태 저장
+let currentProductUrl = '';
 
-function loadImageFromUrl(url) {
-  return new Promise((resolve) => {
+function loadImg(url) {
+  return new Promise(resolve => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
+    // Pollinations는 crossOrigin 없이
+    img.crossOrigin = url.includes('pollinations') ? '' : 'anonymous';
     img.src = url;
   });
 }
 
+async function fetchVariation(concept) {
+  // 1. 카피 생성 (각 컨셉별 다른 톤)
+  const res = await fetch('/api/scrape', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: currentProductUrl, tone: concept.tone })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+
+  // 2. 배경 이미지 생성 (컨셉별 다른 스타일)
+  const baseBg = data.bgPrompt || 'professional product background';
+  const fullPrompt = `${concept.bgStyle}, ${baseBg}, no text, no watermark, high quality`;
+  const seed = Math.floor(Math.random() * 999999);
+  const imgUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1080&height=1080&nologo=true&seed=${seed}`;
+  const img = await loadImg(imgUrl);
+
+  return { copy: data.copy, img, imgUrl };
+}
+
 async function renderVariations() {
+  if (!currentProductUrl) {
+    alert('먼저 제품 URL을 입력하고 분석 버튼을 눌러주세요!');
+    return;
+  }
+
   const varRow = document.getElementById('varRow');
   varRow.querySelectorAll('.var-thumb').forEach(t => t.remove());
-  varStates = [];
 
-  // 로딩 플레이스홀더 5개 먼저 표시
+  // 로딩 플레이스홀더 생성
   const placeholders = varConcepts.map((concept, i) => {
     const wrap = document.createElement('div');
-    wrap.className = 'var-thumb' + (i===0?' active':'');
-    wrap.style.cssText = 'display:flex;align-items:center;justify-content:center;background:#1a1a1a;';
-    wrap.innerHTML = `<div style="text-align:center;"><div style="font-size:9px;color:#666;margin-bottom:4px;">${concept.label}</div><div style="font-size:16px;">⏳</div></div>`;
+    wrap.className = 'var-thumb';
+    wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;background:#111;gap:4px;cursor:default;';
+    wrap.innerHTML = `<div style="font-size:16px;">⏳</div><div style="font-size:9px;color:#555;">${concept.label}</div>`;
     varRow.appendChild(wrap);
     return wrap;
   });
 
-  // 각 베리에이션 병렬로 생성
-  const promises = varConcepts.map(async (concept, i) => {
+  // 5개 베리에이션 병렬 생성
+  varConcepts.map(async (concept, i) => {
     try {
-      // 이미지 생성
-      const seed = Math.floor(Math.random() * 999999) + i * 1000;
-      const basePrompt = S.currentBgPrompt || 'professional product advertisement background';
-      const fullPrompt = `${concept.bgStyle}, ${basePrompt}, no text, no watermark, high quality`;
-      const encodedPrompt = encodeURIComponent(fullPrompt);
-      const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1080&nologo=true&seed=${seed}`;
+      const { copy, img } = await fetchVariation(concept);
 
-      const img = await loadImageFromUrl(imgUrl);
-
-      // 베리에이션 상태 생성
+      // 이 베리에이션의 전체 상태
       const varState = {
         ...S,
         bgImg: img || S.bgImg,
-        headline: S.headline,
-        subtext: S.subtext,
-        ctaText: concept.ctaSuffix || S.ctaText,
-        overlayColor: concept.overlayColor,
-        overlayOpacity: concept.overlayOpacity,
-        textColor: concept.textColor,
-        subColor: concept.subColor,
-        ctaBgColor: concept.ctaBgColor,
-        ctaTextColor: concept.ctaTextColor,
+        headline: copy.headline || S.headline,
+        subtext: copy.subtext || S.subtext,
+        ctaText: copy.cta || S.ctaText,
+        logoText: copy.brand || S.logoText,
       };
-      varStates[i] = varState;
 
-      // 썸네일 캔버스 그리기
+      // 썸네일 그리기
       const c = document.createElement('canvas');
-      drawAdFull(c, varState);
+      c.width = 300; c.height = 300;
+      drawAd(c, varState, null);
       c.style.cssText = 'width:72px;height:72px;display:block;';
 
       placeholders[i].innerHTML = '';
+      placeholders[i].style.cssText = '';
+      placeholders[i].className = 'var-thumb';
       placeholders[i].appendChild(c);
+      placeholders[i].style.cursor = 'pointer';
+
+      // 클릭 시 메인 캔버스에 완전히 적용
       placeholders[i].addEventListener('click', () => {
         document.querySelectorAll('.var-thumb').forEach(t => t.classList.remove('active'));
         placeholders[i].classList.add('active');
-        // 메인 캔버스에 적용
-        applyVariationState(varState);
+
+        // S 상태 전체 업데이트
+        S.bgImg = varState.bgImg;
+        S.headline = varState.headline;
+        S.subtext = varState.subtext;
+        S.ctaText = varState.ctaText;
+        S.logoText = varState.logoText;
+
+        // UI 텍스트 필드 업데이트
+        document.getElementById('headline').value = S.headline;
+        document.getElementById('subtext').value = S.subtext;
+        document.getElementById('ctaText').value = S.ctaText;
+        document.getElementById('logoText').value = S.logoText;
+        if (S.bgImg) {
+          document.getElementById('bgThumb').src = S.bgImg.src || '';
+          document.getElementById('bgThumb').style.display = 'block';
+          document.querySelector('#bgZone p').textContent = concept.label + ' 베리에이션 적용됨';
+        }
+
+        activeVariation = null;
+        liveRender(null);
       });
 
     } catch(e) {
-      placeholders[i].innerHTML = `<div style="font-size:9px;color:#666;text-align:center;">${concept.label}<br>오류</div>`;
+      placeholders[i].innerHTML = `<div style="font-size:9px;color:#ff5252;text-align:center;padding:4px;">${concept.label}<br>실패</div>`;
     }
   });
-
-  await Promise.allSettled(promises);
 }
 
-function drawAdFull(canvas, state) {
-  drawAd(canvas, state, null);
-}
-
-function applyVariationState(varState) {
-  S.bgImg = varState.bgImg;
-  S.overlayColor = varState.overlayColor;
-  S.overlayOpacity = varState.overlayOpacity;
-  S.textColor = varState.textColor;
-  S.subColor = varState.subColor;
-  S.ctaBgColor = varState.ctaBgColor;
-  S.ctaTextColor = varState.ctaTextColor;
-  S.ctaText = varState.ctaText;
-
-  // 색상 피커 UI도 업데이트
-  document.querySelectorAll('#ctaTextColorPicker .hex-preview').forEach(el => el.style.background = varState.ctaTextColor);
-  document.querySelectorAll('#ctaBgColorPicker .hex-preview').forEach(el => el.style.background = varState.ctaBgColor);
-  document.querySelectorAll('#textColorPicker .hex-preview').forEach(el => el.style.background = varState.textColor);
-  document.getElementById('ctaText').value = varState.ctaText;
-  document.getElementById('overlayOpacity').value = varState.overlayOpacity;
-  document.getElementById('overlayVal').textContent = varState.overlayOpacity + '%';
-
+document.getElementById('generateBtn').addEventListener('click', async () => {
+  liveMode = true;
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('canvasWrap').style.display = 'inline-block';
+  document.getElementById('varSection').style.display = 'flex';
+  document.getElementById('toolbar').style.display = 'flex';
   activeVariation = null;
-  const canvas = document.getElementById('mainCanvas');
-  drawAd(canvas, S, null);
-  scaleCanvas(canvas);
-  updateHandles();
-}
-
-document.getElementById('generateBtn').addEventListener('click', async ()=>{
-  liveMode=true;
-  document.getElementById('emptyState').style.display='none';
-  document.getElementById('canvasWrap').style.display='inline-block';
-  document.getElementById('varSection').style.display='flex';
-  document.getElementById('toolbar').style.display='flex';
-  activeVariation=null; liveRender(null); await renderVariations();
+  liveRender(null);
+  if (currentProductUrl) renderVariations();
 });
 
-document.getElementById('varBtn').addEventListener('click', async ()=>{ await renderVariations(); });
-document.getElementById('downloadBtn').addEventListener('click', ()=>{
-  const tmp=document.createElement('canvas');
-  drawAd(tmp,S,activeVariation);
-  const a=document.createElement('a');
-  a.download=`ad_${S.canvasW}x${S.canvasH}.png`;
-  a.href=tmp.toDataURL('image/png'); a.click();
+document.getElementById('varBtn').addEventListener('click', () => { renderVariations(); });
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const tmp = document.createElement('canvas');
+  drawAd(tmp, S, activeVariation);
+  const a = document.createElement('a');
+  a.download = `ad_${S.canvasW}x${S.canvasH}.png`;
+  a.href = tmp.toDataURL('image/png'); a.click();
 });
-window.addEventListener('resize',()=>{ if(liveMode){ scaleCanvas(document.getElementById('mainCanvas')); updateHandles(); } });
+window.addEventListener('resize', () => { if (liveMode) { scaleCanvas(document.getElementById('mainCanvas')); updateHandles(); } });
 </script>
 </body>
 </html>
