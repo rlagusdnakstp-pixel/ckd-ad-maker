@@ -640,26 +640,28 @@ function drawAdFull(canvas, state) {
 }
 
 function applyVariationState(varState) {
-  // 현재 S 상태를 베리에이션으로 임시 변경해서 렌더링
-  const savedState = {
-    bgImg: S.bgImg, headline: S.headline, subtext: S.subtext,
-    ctaText: S.ctaText, overlayColor: S.overlayColor, overlayOpacity: S.overlayOpacity,
-    textColor: S.textColor, subColor: S.subColor, ctaBgColor: S.ctaBgColor, ctaTextColor: S.ctaTextColor,
-  };
+  S.bgImg = varState.bgImg;
+  S.overlayColor = varState.overlayColor;
+  S.overlayOpacity = varState.overlayOpacity;
+  S.textColor = varState.textColor;
+  S.subColor = varState.subColor;
+  S.ctaBgColor = varState.ctaBgColor;
+  S.ctaTextColor = varState.ctaTextColor;
+  S.ctaText = varState.ctaText;
 
-  Object.assign(S, {
-    bgImg: varState.bgImg,
-    overlayColor: varState.overlayColor,
-    overlayOpacity: varState.overlayOpacity,
-    textColor: varState.textColor,
-    subColor: varState.subColor,
-    ctaBgColor: varState.ctaBgColor,
-    ctaTextColor: varState.ctaTextColor,
-    ctaText: varState.ctaText,
-  });
+  // 색상 피커 UI도 업데이트
+  document.querySelectorAll('#ctaTextColorPicker .hex-preview').forEach(el => el.style.background = varState.ctaTextColor);
+  document.querySelectorAll('#ctaBgColorPicker .hex-preview').forEach(el => el.style.background = varState.ctaBgColor);
+  document.querySelectorAll('#textColorPicker .hex-preview').forEach(el => el.style.background = varState.textColor);
+  document.getElementById('ctaText').value = varState.ctaText;
+  document.getElementById('overlayOpacity').value = varState.overlayOpacity;
+  document.getElementById('overlayVal').textContent = varState.overlayOpacity + '%';
 
   activeVariation = null;
-  liveRender(null);
+  const canvas = document.getElementById('mainCanvas');
+  drawAd(canvas, S, null);
+  scaleCanvas(canvas);
+  updateHandles();
 }
 
 document.getElementById('generateBtn').addEventListener('click', async ()=>{
