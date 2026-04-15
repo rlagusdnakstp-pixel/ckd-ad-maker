@@ -5,7 +5,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   }
 
-  const { url } = await req.json();
+  const { url, tone } = await req.json();
   if (!url) return new Response(JSON.stringify({ error: 'URL required' }), { status: 400 });
 
   const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -29,17 +29,19 @@ export default async function handler(req) {
     pageText = `제품 URL: ${url}`;
   }
 
-  // 2. OpenRouter로 카피 + 배경 프롬프트 생성
-  const prompt = `당신은 광고 카피라이터입니다. 아래 제품 페이지 내용을 보고 한국어 광고 카피와 배경 이미지 프롬프트를 만들어주세요.
+  // 2. 카피 생성 (tone이 있으면 해당 톤으로)
+  const toneInstruction = tone ? `${tone} 스타일로 카피를 작성해주세요.` : '';
+  const prompt = `당신은 광고 카피라이터입니다. 아래 제품 페이지 내용을 보고 한국어 광고 카피를 만들어주세요.
+${toneInstruction}
 
 페이지 내용:
 ${pageText}
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트나 마크다운은 절대 포함하지 마세요:
-{"headline":"헤드라인(20자이내)","subtext":"서브텍스트(30자이내)","cta":"CTA버튼(10자이내)","brand":"브랜드명(15자이내)","bgPrompt":"영어로된 광고배경 이미지 프롬프트 (예: dark luxury background with bokeh lights, professional product photography)"}`;
+{"headline":"헤드라인(20자이내)","subtext":"서브텍스트(30자이내)","cta":"CTA버튼(10자이내)","brand":"브랜드명(15자이내)","bgPrompt":"영어 배경 이미지 프롬프트"}`;
 
   let copy = { headline: "특별한 제품을 만나보세요", subtext: "지금 바로 확인해보세요", cta: "지금 구매하기", brand: "BRAND" };
-  let bgPrompt = 'professional product advertisement background, studio lighting, elegant';
+  let bgPrompt = 'professional product advertisement background, studio lighting';
 
   try {
     const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -54,7 +56,7 @@ ${pageText}
         model: 'openrouter/elephant-alpha',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 400,
-        temperature: 0.7
+        temperature: 0.8
       })
     });
 
@@ -64,7 +66,7 @@ ${pageText}
 
     let parsed = {};
     try { parsed = JSON.parse(rawText.trim()); }
-    catch { try { parsed = JSON.parse(rawText.replace(/```json\s*/gi,'').replace(/```\s*/gi,'').trim()); } catch { const m = rawText.match(/\{[\s\S]*?\}/); if(m) parsed = JSON.parse(m[0]); } }
+    catch { try { parsed = JSON.parse(rawText.replace(/```json\s*/gi,'').replace(/```\s*/gi,'').trim()); } catch { const m = rawText.match(/\{[\s\S]*?\}/); if(m) try { parsed = JSON.parse(m[0]); } catch {} } }
 
     if (parsed.headline) copy.headline = parsed.headline;
     if (parsed.subtext)  copy.subtext  = parsed.subtext;
@@ -76,16 +78,12 @@ ${pageText}
     // 기본값 사용
   }
 
-  // 3. Pollinations AI 배경 이미지 URL 생성 (base64 변환 없이 URL만 반환)
-  const fullPrompt = `${bgPrompt}, no text, no watermark, no people, advertisement background, high quality`;
+  // 3. Pollinations 배경 이미지 URL
   const seed = Math.floor(Math.random() * 999999);
+  const fullPrompt = `${bgPrompt}, no text, no watermark, no people, advertisement background, high quality`;
   const generatedImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1080&height=1080&nologo=true&seed=${seed}`;
 
-  return new Response(JSON.stringify({
-    copy,
-    bgPrompt,
-    generatedImageUrl,  // Pollinations AI 생성 이미지 URL
-  }), {
+  return new Response(JSON.stringify({ copy, bgPrompt, generatedImageUrl }), {
     status: 200,
     headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
   });
