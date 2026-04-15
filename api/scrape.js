@@ -64,7 +64,7 @@ ${pageText}
         'X-Title': 'AD Maker'
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-8b-instruct:free',
+        model: 'meta-llama/llama-3.2-3b-instruct:free',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 300,
         temperature: 0.7
