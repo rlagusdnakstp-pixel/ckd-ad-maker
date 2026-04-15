@@ -8,8 +8,8 @@ export default async function handler(req) {
   const { url } = await req.json();
   if (!url) return new Response(JSON.stringify({ error: 'URL required' }), { status: 400 });
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) return new Response(JSON.stringify({ error: 'GEMINI_API_KEY가 설정되지 않았어요' }), { status: 500 });
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+  if (!OPENROUTER_API_KEY) return new Response(JSON.stringify({ error: 'OPENROUTER_API_KEY가 설정되지 않았어요' }), { status: 500 });
 
   // 1. 페이지 HTML 가져오기
   let pageText = '';
@@ -45,39 +45,37 @@ export default async function handler(req) {
     pageText = `제품 URL: ${url}`;
   }
 
-  // 2. Gemini API 호출
+  // 2. OpenRouter API 호출
   const prompt = `당신은 광고 카피라이터입니다. 아래 제품 페이지 내용을 보고 한국어 광고 카피를 만들어주세요.
 
 페이지 내용:
 ${pageText}
 
-반드시 아래 JSON 형식으로만 응답하세요. 절대 다른 텍스트나 마크다운을 포함하지 마세요:
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트나 마크다운은 절대 포함하지 마세요:
 {"headline":"헤드라인(20자이내)","subtext":"서브텍스트(30자이내)","cta":"CTA버튼(10자이내)","brand":"브랜드명(15자이내)"}`;
 
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 300,
-            responseMimeType: "application/json"
-          }
-        })
-      }
-    );
+    const aiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://ad-maker.vercel.app',
+        'X-Title': 'AD Maker'
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-3.1-8b-instruct:free',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 300,
+        temperature: 0.7
+      })
+    });
 
-    const geminiData = await geminiRes.json();
+    const aiData = await aiRes.json();
 
-    if (geminiData.error) {
-      throw new Error('Gemini 오류: ' + geminiData.error.message);
-    }
+    if (aiData.error) throw new Error('AI 오류: ' + aiData.error.message);
 
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const rawText = aiData.choices?.[0]?.message?.content || '';
 
     let copy = {};
     try {
