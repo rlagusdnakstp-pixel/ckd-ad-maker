@@ -64,7 +64,7 @@ ${pageText}
         'X-Title': 'AD Maker'
       },
       body: JSON.stringify({
-        model: 'google/gemma-3-4b-it:free',
+        model: 'openrouter/elephant-alpha',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 300,
         temperature: 0.7
