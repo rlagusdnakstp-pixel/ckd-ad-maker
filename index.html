@@ -418,35 +418,17 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     });
     const data = await res.json();
     if(data.error) throw new Error(data.error);
-    const {copy, imageUrl, imageBase64, bgPrompt} = data;
+    const {copy, bgPrompt, generatedImageUrl} = data;
     S.currentBgPrompt = bgPrompt || '';
+
     if(copy.headline){ S.headline=copy.headline; document.getElementById('headline').value=copy.headline; }
     if(copy.subtext){  S.subtext=copy.subtext;   document.getElementById('subtext').value=copy.subtext; }
     if(copy.cta){      S.ctaText=copy.cta;        document.getElementById('ctaText').value=copy.cta; }
     if(copy.brand){    S.logoText=copy.brand;     document.getElementById('logoText').value=copy.brand; }
 
-    // base64 이미지 우선 적용 (CORS 문제 없음)
-    const imgSrc = imageBase64 || imageUrl;
-    if(imgSrc){
-      statusText.textContent='🎨 배경 이미지 생성 중...';
-      const img=new Image();
-      img.onload=()=>{
-        S.bgImg=img;
-        document.getElementById('bgThumb').src=imgSrc;
-        document.getElementById('bgThumb').style.display='block';
-        document.querySelector('#bgZone p').textContent='AI 배경 이미지 적용됨 ✓';
-        if(liveMode) liveRender();
-        statusEl.className='ai-status success';
-        statusText.textContent='✓ 카피 + 배경 이미지 자동 생성 완료!';
-      };
-      img.onerror=()=>{
-        statusEl.className='ai-status success';
-        statusText.textContent='✓ 카피 자동 생성 완료! (이미지 로딩 실패)';
-      };
-      img.src=imgSrc;
-    } else {
-      statusEl.className='ai-status success'; statusText.textContent='✓ 카피 자동 생성 완료!';
-    }
+    statusEl.className='ai-status success';
+    statusText.textContent='✓ 카피 생성 완료! 배경 이미지 로딩 중...';
+
     if(!liveMode){
       liveMode=true;
       document.getElementById('emptyState').style.display='none';
@@ -454,7 +436,26 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
       document.getElementById('varSection').style.display='flex';
       document.getElementById('toolbar').style.display='flex';
     }
-    liveRender(null); renderVariations();  } catch(e) {
+    liveRender(null);
+    renderVariations();
+
+    // 배경 이미지 로딩 (Pollinations AI)
+    if(generatedImageUrl){
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        S.bgImg = img;
+        document.getElementById('bgThumb').src = generatedImageUrl;
+        document.getElementById('bgThumb').style.display = 'block';
+        document.querySelector('#bgZone p').textContent = 'AI 배경 이미지 적용됨 ✓';
+        statusText.textContent = '✓ 카피 + 배경 이미지 자동 생성 완료!';
+        liveRender(null);
+      };
+      img.onerror = () => {
+        statusText.textContent = '✓ 카피 생성 완료! (배경 이미지는 수동 업로드 필요)';
+      };
+      img.src = generatedImageUrl;
+    }  } catch(e) {
     statusEl.className='ai-status error'; statusText.textContent='오류: '+e.message;
   } finally {
     btn.disabled=false; spinner.classList.remove('show');
