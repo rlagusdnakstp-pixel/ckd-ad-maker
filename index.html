@@ -419,6 +419,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     const data = await res.json();
     if(data.error) throw new Error(data.error);
     const {copy, imageUrl, imageBase64, bgPrompt} = data;
+    S.currentBgPrompt = bgPrompt || '';
     if(copy.headline){ S.headline=copy.headline; document.getElementById('headline').value=copy.headline; }
     if(copy.subtext){  S.subtext=copy.subtext;   document.getElementById('subtext').value=copy.subtext; }
     if(copy.cta){      S.ctaText=copy.cta;        document.getElementById('ctaText').value=copy.cta; }
@@ -453,8 +454,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
       document.getElementById('varSection').style.display='flex';
       document.getElementById('toolbar').style.display='flex';
     }
-    liveRender(null); renderVariations();
-  } catch(e) {
+    liveRender(null); renderVariations();  } catch(e) {
     statusEl.className='ai-status error'; statusText.textContent='오류: '+e.message;
   } finally {
     btn.disabled=false; spinner.classList.remove('show');
@@ -549,38 +549,128 @@ function liveRender(variation){
   drawAd(canvas,S,activeVariation); scaleCanvas(canvas); updateHandles();
 }
 
-const varDefs=[
-  {overlayColor:'#FF4D1C',opacityDelta:8,textColor:'#FFFFFF',subColor:'#FFFFFF',ctaBgColor:'#0A0A0A',ctaTextColor:'#FFFFFF'},
-  {overlayColor:'#1C6EFF',opacityDelta:5,textColor:'#FFFFFF',subColor:'#FFE135',ctaBgColor:'#FFE135',ctaTextColor:'#0A0A0A',headlineScale:1.05},
-  {overlayColor:'#0A0A0A',opacityDelta:-5,textColor:'#FFE135',subColor:'#FFFFFF',ctaBgColor:'#FF4D1C',ctaTextColor:'#FFFFFF'},
-  {overlayColor:'#1a4a1a',opacityDelta:10,textColor:'#FFFFFF',subColor:'#CCFF44',ctaBgColor:'#66DD22',ctaTextColor:'#0A0A0A'},
-  {overlayColor:'#3a1a4a',opacityDelta:8,textColor:'#FFE135',subColor:'#FF80CC',ctaBgColor:'#FF4D1C',ctaTextColor:'#FFFFFF'},
+// 베리에이션 컨셉 정의 - 각각 다른 이미지 + 카피 스타일
+const varConcepts = [
+  { label:'미니멀', bgStyle:'clean minimal white background, soft shadows, elegant product photography, studio light', overlayColor:'#FFFFFF', overlayOpacity:20, textColor:'#0A0A0A', subColor:'#444444', ctaBgColor:'#0A0A0A', ctaTextColor:'#FFFFFF', headlineSuffix:'— 심플하게', ctaSuffix:'지금 확인' },
+  { label:'럭셔리', bgStyle:'dark luxury background, gold bokeh lights, premium product photography, cinematic', overlayColor:'#0A0A0A', overlayOpacity:40, textColor:'#FFE135', subColor:'#FFFFFF', ctaBgColor:'#FFE135', ctaTextColor:'#0A0A0A', headlineSuffix:'— 프리미엄', ctaSuffix:'프리미엄 구매' },
+  { label:'다이나믹', bgStyle:'energetic vibrant background, dynamic diagonal lines, bold colors, sports advertisement style', overlayColor:'#FF4D1C', overlayOpacity:45, textColor:'#FFFFFF', subColor:'#FFE135', ctaBgColor:'#0A0A0A', ctaTextColor:'#FFFFFF', headlineSuffix:'— 지금 바로!', ctaSuffix:'바로 구매' },
+  { label:'자연', bgStyle:'natural organic background, soft green tones, nature elements, fresh and clean', overlayColor:'#1a4a1a', overlayOpacity:40, textColor:'#FFFFFF', subColor:'#CCFF88', ctaBgColor:'#4CAF50', ctaTextColor:'#FFFFFF', headlineSuffix:'— 자연그대로', ctaSuffix:'자연 구매' },
+  { label:'모던', bgStyle:'modern tech background, geometric patterns, blue gradient, futuristic digital', overlayColor:'#1C3EFF', overlayOpacity:45, textColor:'#FFFFFF', subColor:'#88DDFF', ctaBgColor:'#FFFFFF', ctaTextColor:'#1C3EFF', headlineSuffix:'— 스마트하게', ctaSuffix:'스마트 구매' },
 ];
 
-function renderVariations(){
-  const varRow=document.getElementById('varRow');
-  varRow.querySelectorAll('.var-thumb').forEach(t=>t.remove());
-  varDefs.forEach((v,i)=>{
-    const wrap=document.createElement('div');
-    wrap.className='var-thumb'+(i===0?' active':'');
-    const c=document.createElement('canvas');
-    drawAd(c,S,v); c.style.cssText='width:72px;height:72px;display:block;';
-    wrap.appendChild(c);
-    wrap.addEventListener('click',()=>{ document.querySelectorAll('.var-thumb').forEach(t=>t.classList.remove('active')); wrap.classList.add('active'); liveRender(v); });
-    varRow.appendChild(wrap);
+let varStates = []; // 각 베리에이션의 전체 상태 저장
+
+function loadImageFromUrl(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
   });
 }
 
-document.getElementById('generateBtn').addEventListener('click', ()=>{
+async function renderVariations() {
+  const varRow = document.getElementById('varRow');
+  varRow.querySelectorAll('.var-thumb').forEach(t => t.remove());
+  varStates = [];
+
+  // 로딩 플레이스홀더 5개 먼저 표시
+  const placeholders = varConcepts.map((concept, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'var-thumb' + (i===0?' active':'');
+    wrap.style.cssText = 'display:flex;align-items:center;justify-content:center;background:#1a1a1a;';
+    wrap.innerHTML = `<div style="text-align:center;"><div style="font-size:9px;color:#666;margin-bottom:4px;">${concept.label}</div><div style="font-size:16px;">⏳</div></div>`;
+    varRow.appendChild(wrap);
+    return wrap;
+  });
+
+  // 각 베리에이션 병렬로 생성
+  const promises = varConcepts.map(async (concept, i) => {
+    try {
+      // 이미지 생성
+      const seed = Math.floor(Math.random() * 999999) + i * 1000;
+      const basePrompt = S.currentBgPrompt || 'professional product advertisement background';
+      const fullPrompt = `${concept.bgStyle}, ${basePrompt}, no text, no watermark, high quality`;
+      const encodedPrompt = encodeURIComponent(fullPrompt);
+      const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1080&nologo=true&seed=${seed}`;
+
+      const img = await loadImageFromUrl(imgUrl);
+
+      // 베리에이션 상태 생성
+      const varState = {
+        ...S,
+        bgImg: img || S.bgImg,
+        headline: S.headline,
+        subtext: S.subtext,
+        ctaText: concept.ctaSuffix || S.ctaText,
+        overlayColor: concept.overlayColor,
+        overlayOpacity: concept.overlayOpacity,
+        textColor: concept.textColor,
+        subColor: concept.subColor,
+        ctaBgColor: concept.ctaBgColor,
+        ctaTextColor: concept.ctaTextColor,
+      };
+      varStates[i] = varState;
+
+      // 썸네일 캔버스 그리기
+      const c = document.createElement('canvas');
+      drawAdFull(c, varState);
+      c.style.cssText = 'width:72px;height:72px;display:block;';
+
+      placeholders[i].innerHTML = '';
+      placeholders[i].appendChild(c);
+      placeholders[i].addEventListener('click', () => {
+        document.querySelectorAll('.var-thumb').forEach(t => t.classList.remove('active'));
+        placeholders[i].classList.add('active');
+        // 메인 캔버스에 적용
+        applyVariationState(varState);
+      });
+
+    } catch(e) {
+      placeholders[i].innerHTML = `<div style="font-size:9px;color:#666;text-align:center;">${concept.label}<br>오류</div>`;
+    }
+  });
+
+  await Promise.allSettled(promises);
+}
+
+function drawAdFull(canvas, state) {
+  drawAd(canvas, state, null);
+}
+
+function applyVariationState(varState) {
+  // 현재 S 상태를 베리에이션으로 임시 변경해서 렌더링
+  const savedState = {
+    bgImg: S.bgImg, headline: S.headline, subtext: S.subtext,
+    ctaText: S.ctaText, overlayColor: S.overlayColor, overlayOpacity: S.overlayOpacity,
+    textColor: S.textColor, subColor: S.subColor, ctaBgColor: S.ctaBgColor, ctaTextColor: S.ctaTextColor,
+  };
+
+  Object.assign(S, {
+    bgImg: varState.bgImg,
+    overlayColor: varState.overlayColor,
+    overlayOpacity: varState.overlayOpacity,
+    textColor: varState.textColor,
+    subColor: varState.subColor,
+    ctaBgColor: varState.ctaBgColor,
+    ctaTextColor: varState.ctaTextColor,
+    ctaText: varState.ctaText,
+  });
+
+  activeVariation = null;
+  liveRender(null);
+}
+
+document.getElementById('generateBtn').addEventListener('click', async ()=>{
   liveMode=true;
   document.getElementById('emptyState').style.display='none';
   document.getElementById('canvasWrap').style.display='inline-block';
   document.getElementById('varSection').style.display='flex';
   document.getElementById('toolbar').style.display='flex';
-  activeVariation=null; liveRender(null); renderVariations();
+  activeVariation=null; liveRender(null); await renderVariations();
 });
 
-document.getElementById('varBtn').addEventListener('click', renderVariations);
+document.getElementById('varBtn').addEventListener('click', async ()=>{ await renderVariations(); });
 document.getElementById('downloadBtn').addEventListener('click', ()=>{
   const tmp=document.createElement('canvas');
   drawAd(tmp,S,activeVariation);
